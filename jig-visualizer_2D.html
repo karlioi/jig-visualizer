@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Wolverine & Vari-Grind Geometry Visualizer</title>
+<style>
+  body{ font-family: 'Segoe UI', Arial, sans-serif; background:#111; color:#eee; text-align:center; }
+  canvas{ background:#222; border:1px solid #555; margin-top:10px; border-radius: 4px; }
+  label{ display:block; margin:10px; font-size: 0.9em; color: #bbb; }
+  .controls { background: #333; padding: 20px; display: inline-block; border-radius: 8px; margin-top: 10px; border: 1px solid #444; }
+  .angle-display { font-size: 2.2em; color: #ffaa00; margin: 10px 0; font-weight: bold; }
+  span { font-weight: bold; color: #00ffaa; }
+  .error-msg { color: #ff4444; font-size: 0.9em; height: 20px; }
+</style>
+</head>
+<body>
+
+<h2>Wolverine V-Arm & Vari-Grind Visualizer</h2>
+<div class="angle-display">Bevel Angle: <span id="bevelVal">--</span>°</div>
+
+<canvas id="c" width="900" height="520"></canvas>
+
+<div class="controls">
+  <label>
+    Leg Angle (deg):
+    <input type="range" id="legAngle" min="0" max="90" step="0.5" value="45">
+    <span id="legAngleVal">45</span>
+  </label>
+
+  <label>
+    V-Arm Distance from Face (in):
+    <input type="range" id="vArm" min="1" max="12" step="0.1" value="6.5">
+    <span id="vArmVal">6.5</span>
+  </label>
+
+  <label>
+    Tool Protrusion (in):
+    <input type="range" id="prot" min="1.5" max="3.5" step="0.01" value="2">
+    <span id="protVal">2</span>
+  </label>
+  <div id="status" class="error-msg"></div>
+</div>
+
+<script>
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+const statusDiv = document.getElementById("status");
+const bevelSpan = document.getElementById("bevelVal");
+
+const scale = 45; // Slightly larger for clarity
+const wheelDiameter = 8;
+const wheelRadius = wheelDiameter/2;
+const legLength = 5; 
+
+const legSlider = document.getElementById("legAngle");
+const vArmSlider = document.getElementById("vArm");
+const protSlider = document.getElementById("prot");
+
+const legVal = document.getElementById("legAngleVal");
+const vVal = document.getElementById("vArmVal");
+const pVal = document.getElementById("protVal");
+
+function draw(){
+  const legAngleDeg = Number(legSlider.value);
+  const legAngleRad = legAngleDeg * Math.PI / 180;
+  const vArmDist = Number(vArmSlider.value);
+  const protrusion = Number(protSlider.value);
+
+  legVal.textContent = legAngleDeg.toFixed(1);
+  vVal.textContent = vArmDist.toFixed(1);
+  pVal.textContent = protrusion.toFixed(2);
+
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // 1. Wheel Setup
+  const wheelX = canvas.width * 0.35;
+  const wheelY = canvas.height * 0.45;
+  const wheelRadiusPx = wheelRadius * scale;
+  const wheelFaceX = wheelX + wheelRadiusPx;
+
+  // Draw Wheel
+  ctx.strokeStyle="#888";
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.arc(wheelX, wheelY, wheelRadiusPx, 0, Math.PI*2);
+  ctx.stroke();
+
+  // 2. V-ARM (Tangent to bottom)
+  const vArmY = wheelY + wheelRadiusPx; 
+  const vPocketX = wheelFaceX + (vArmDist * scale);
+  const vPocketY = vArmY;
+
+  ctx.strokeStyle="#444";
+  ctx.lineWidth=8;
+  ctx.beginPath();
+  ctx.moveTo(wheelX - 100, vArmY); 
+  ctx.lineTo(vPocketX, vArmY);
+  ctx.stroke();
+
+  // 3. PIVOT SOLVER (Quadrant 1 strictly)
+  let best = null;
+  let minErr = Infinity;
+
+  for(let pivotAngle = Math.PI; pivotAngle < 2 * Math.PI; pivotAngle += 0.0005) {
+    const jigX = vPocketX + Math.cos(pivotAngle) * legLength * scale;
+    const jigY = vPocketY + Math.sin(pivotAngle) * legLength * scale;
+
+    const toolDir = pivotAngle - legAngleRad;
+    const tipX = jigX + Math.cos(toolDir) * protrusion * scale;
+    const tipY = jigY + Math.sin(toolDir) * protrusion * scale;
+
+    const dx = tipX - wheelX;
+    const dy = tipY - wheelY;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    const err = Math.abs(dist - wheelRadiusPx);
+
+    // Q1 Constraint: Tip must be right of center and above center
+    if(err < minErr && tipX >= wheelX && tipY <= wheelY) {
+      minErr = err;
+      best = { jigX, jigY, tipX, tipY, toolDir };
+    }
+  }
+
+  if(best && minErr < 1) {
+    statusDiv.textContent = "";
+    
+    // --- FINAL CORRECT BEVEL CALCULATION ---
+    // Vector 1: Tool Shaft (Tip to Jig Pivot)
+    const vtX = best.jigX - best.tipX;
+    const vtY = best.jigY - best.tipY;
+    
+    // Vector 2: Wheel Radius (Tip to Wheel Center)
+    const vrX = wheelX - best.tipX;
+    const vrY = wheelY - best.tipY;
+    
+    // Angle between vectors using dot product
+    const dot = vtX * vrX + vtY * vrY;
+    const magT = Math.sqrt(vtX*vtX + vtY*vtY);
+    const magR = Math.sqrt(vrX*vrX + vrY*vrY);
+    const cosTheta = dot / (magT * magR);
+    const theta = Math.acos(Math.max(-1, Math.min(1, cosTheta)));
+    
+    // The bevel angle is the complement to the angle with the radius
+    let finalBevel = 90 - (theta * 180 / Math.PI);
+    
+    bevelSpan.textContent = Math.abs(finalBevel).toFixed(1);
+
+    // Draw Leg
+    ctx.strokeStyle="#00ffaa";
+    ctx.lineWidth=3;
+    ctx.beginPath();
+    ctx.moveTo(vPocketX, vPocketY);
+    ctx.lineTo(best.jigX, best.jigY);
+    ctx.stroke();
+
+    // Draw Tool
+    ctx.strokeStyle="#ffaa00";
+    ctx.lineWidth=5;
+    ctx.beginPath();
+    ctx.moveTo(best.jigX, best.jigY);
+    ctx.lineTo(best.tipX, best.tipY);
+    ctx.stroke();
+
+    // Visual Tangent
+    const radAng = Math.atan2(best.tipY - wheelY, best.tipX - wheelX);
+    const tanAng = radAng - Math.PI/2;
+    ctx.strokeStyle = "rgba(255, 68, 68, 0.6)";
+    ctx.setLineDash([5, 5]);
+    const tanLen = 80;
+    ctx.beginPath();
+    ctx.moveTo(best.tipX + Math.cos(tanAng) * tanLen, best.tipY + Math.sin(tanAng) * tanLen);
+    ctx.lineTo(best.tipX - Math.cos(tanAng) * tanLen, best.tipY - Math.sin(tanAng) * tanLen);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Draw Contact Point
+    ctx.fillStyle="#ff4444";
+    ctx.beginPath();
+    ctx.arc(best.tipX, best.tipY, 4, 0, Math.PI*2);
+    ctx.fill();
+  } else {
+    statusDiv.textContent = "Geometry Unreachable (Check Settings)";
+    bevelSpan.textContent = "--";
+  }
+}
+
+[legSlider, vArmSlider, protSlider].forEach(s => s.oninput = draw);
+draw();
+</script>
+</body>
+</html>

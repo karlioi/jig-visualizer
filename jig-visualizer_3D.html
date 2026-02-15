@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Wolverine & Vari-Grind - Precision Geometry</title>
+<style>
+body{ font-family: 'Segoe UI', Arial; background:#111; color:#eee; text-align:center; margin: 0; padding: 20px; }
+.canvas-container { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; }
+canvas{ background:#151515; border:1px solid #444; border-radius:4px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+.controls { background:#222; padding:20px; display:inline-block; border-radius:8px; margin-top:20px; border:1px solid #333; }
+.stats { display:flex; justify-content:center; gap:20px; margin-bottom:10px; }
+.stat { background:#1a1a1a; padding:12px 20px; border-radius:8px; border-bottom:3px solid #00ffaa; min-width: 140px; }
+.stat-label { font-size:.75em; color:#888; text-transform:uppercase; letter-spacing:1px; }
+.stat-value { font-size:1.6em; color:#ffaa00; font-weight:bold; margin-top:5px; }
+label { margin: 0 15px; font-weight: bold; }
+span { font-weight:bold; color:#00ffaa; }
+</style>
+</head>
+<body>
+
+<h2>Wolverine & Vari-Grind: Precision Model</h2>
+
+<div class="stats">
+    <div class="stat"><div class="stat-label">Nose Bevel</div><div class="stat-value" id="bevelVal">--</div></div>
+    <div class="stat"><div class="stat-label">Wing Length</div><div class="stat-value" id="wingLenVal">--</div></div>
+    <div class="stat"><div class="stat-label">V-Arm Setting</div><div class="stat-value" id="vDistStat">--</div></div>
+</div>
+
+<div class="canvas-container">
+    <div>
+        <h3>Side View (Unified Mesh)</h3>
+        <canvas id="sideCanvas" width="650" height="400"></canvas>
+    </div>
+    <div>
+        <h3>Top View (Aligned)</h3>
+        <canvas id="topCanvas" width="350" height="400"></canvas>
+    </div>
+</div>
+
+<div class="controls">
+<label>Leg Angle: <input type="range" id="legAngle" min="0" max="80" step="0.5" value="45"> <span id="legAngleVal">45</span>°</label>
+<label>V-Arm: <input type="range" id="vArm" min="2" max="12" step="0.1" value="6.5"> <span id="vArmVal">6.5</span>"</label>
+<label>Protrusion: <input type="range" id="prot" min="1.5" max="2.5" step="0.01" value="2.00"> <span id="protVal">2.00</span>"</label>
+</div>
+
+<script>
+const sCanvas = document.getElementById("sideCanvas");
+const tCanvas = document.getElementById("topCanvas");
+const sCtx = sCanvas.getContext("2d");
+const tCtx = tCanvas.getContext("2d");
+
+const scale = 35; 
+const wRad = 4;
+const gDia = 0.5;
+const webThick = 0.18; // Adjusted web
+
+function draw() {
+    const legDeg = parseFloat(document.getElementById("legAngle").value);
+    const vDistFace = parseFloat(document.getElementById("vArm").value);
+    const prot = parseFloat(document.getElementById("prot").value);
+    
+    document.getElementById("legAngleVal").textContent = legDeg.toFixed(1);
+    document.getElementById("vArmVal").textContent = vDistFace.toFixed(1);
+    document.getElementById("protVal").textContent = prot.toFixed(2);
+    document.getElementById("vDistStat").textContent = vDistFace.toFixed(1) + '"';
+
+    const legRad = legDeg * Math.PI / 180;
+    sCtx.clearRect(0,0,sCanvas.width,sCanvas.height);
+    tCtx.clearRect(0,0,tCanvas.width,tCanvas.height);
+
+    const wheelX = 120, wheelY = 140, wRPx = wRad * scale;
+    const vPX = (wheelX + wRPx) + (vDistFace * scale);
+    const vPY = wheelY + wRPx; 
+    
+    let best = null, minErr = Infinity;
+
+    for(let a=Math.PI; a<2*Math.PI; a+=0.001) {
+        let jX = vPX + Math.cos(a)*5*scale, jY = vPY + Math.sin(a)*5*scale;
+        let tDir = a - legRad;
+        let tVX = Math.cos(tDir), tVY = Math.sin(tDir);
+        let tX = jX + tVX * prot * scale, tY = jY + tVY * prot * scale;
+        let rx = wheelX - tX, ry = wheelY - tY, d = Math.sqrt(rx*rx+ry*ry);
+        let dot = ((-tVX)*rx + (-tVY)*ry) / d;
+        let theta = Math.acos(Math.max(-1, Math.min(1, dot)));
+        let bevelDeg = Math.abs(90 - (theta * 180 / Math.PI));
+        let bLen = webThick / Math.sin(theta); 
+        let hX = tX - tVX * bLen * scale, hY = tY - tVY * bLen * scale;
+        let cAng = Math.atan2(hX - wheelX, wheelY - hY) * 180 / Math.PI;
+        let err = Math.abs(Math.sqrt((hX-wheelX)**2 + (hY-wheelY)**2) - wRPx);
+        if(err < minErr && cAng > 0 && cAng < 95) { 
+            minErr=err; 
+            best={jX,jY,tX,tY,hX,hY,tDir,bevelDeg,bLen,tVX,tVY}; 
+        }
+    }
+
+    if(!best) return;
+
+    // Constrained Perspective Math
+    const pX = -best.tVY, pY = best.tVX; 
+    const gDiaPx = gDia * scale;
+    let sweepInches = Math.abs(Math.tan(legRad)) * (gDia/2) * 5; 
+    sweepInches = Math.max(0.1, Math.min(3.5, sweepInches));
+    const sweepPx = sweepInches * scale;
+
+    const wingTop = { x: (best.tX - best.tVX * sweepPx) + pX * gDiaPx, y: (best.tY - best.tVY * sweepPx) + pY * gDiaPx };
+    const heel = { x: best.hX, y: best.hY };
+
+    // --- SIDE VIEW ---
+    sCtx.save();
+    // Grinding Wheel
+    sCtx.fillStyle="#444"; sCtx.beginPath(); sCtx.arc(wheelX,wheelY,wRPx,0,Math.PI*2); sCtx.fill();
+    sCtx.strokeStyle="#666"; sCtx.lineWidth=2; sCtx.stroke();
+    
+    // V-Arm and Pocket
+    sCtx.fillStyle="#333"; sCtx.fillRect(wheelX, vPY, vPX - wheelX, 10);
+    sCtx.strokeStyle="#00ffaa"; sCtx.lineWidth=3;
+    sCtx.beginPath();
+    sCtx.moveTo(vPX - 20, vPY); sCtx.lineTo(vPX, vPY); sCtx.lineTo(vPX, vPY - 20);
+    sCtx.stroke();
+
+    // Clip to Wheel Face
+    sCtx.beginPath(); sCtx.rect(0,0,sCanvas.width,sCanvas.height); sCtx.arc(wheelX,wheelY,wRPx,0,Math.PI*2,true); sCtx.clip("evenodd");
+
+    // SHAFT AND BEVEL DRAWN AS ONE UNIT TO PREVENT GAPS
+    const sBackX = best.tX - best.tVX * 12 * scale, sBackY = best.tY - best.tVY * 12 * scale;
+    
+    // 1. Draw Shaft (Silver/Gray)
+    sCtx.fillStyle="#777"; 
+    sCtx.beginPath();
+    sCtx.moveTo(sBackX, sBackY);
+    sCtx.lineTo(sBackX + pX*gDiaPx, sBackY + pY*gDiaPx);
+    sCtx.lineTo(wingTop.x, wingTop.y);
+    sCtx.lineTo(heel.x, heel.y);
+    sCtx.closePath();
+    sCtx.fill();
+
+    // 2. Draw Bevel (Orange) - Slight overlap added to stroke to kill the gap
+    sCtx.fillStyle="#ffaa00";
+    sCtx.strokeStyle="#ffaa00";
+    sCtx.lineWidth = 0.5;
+    sCtx.beginPath();
+    sCtx.moveTo(heel.x, heel.y);
+    sCtx.lineTo(best.tX, best.tY);
+    // Cutting edge curve
+    sCtx.quadraticCurveTo(best.tX + pX*gDiaPx - best.tVX*sweepPx*0.4, best.tY + pY*gDiaPx, wingTop.x, wingTop.y);
+    // Trailing edge curve - Terminating exactly at heel
+    sCtx.quadraticCurveTo(heel.x + pX*gDiaPx*0.5 - best.tVX*sweepPx*0.3, heel.y + pY*gDiaPx*0.5, heel.x, heel.y);
+    sCtx.fill();
+    sCtx.stroke(); 
+    sCtx.restore();
+
+    // Vari-Grind Leg
+    sCtx.strokeStyle="#eee"; sCtx.lineWidth=2.5;
+    sCtx.beginPath(); sCtx.moveTo(vPX, vPY); sCtx.lineTo(best.jX, best.jY); sCtx.stroke();
+    sCtx.fillStyle="#00ffaa"; sCtx.beginPath(); sCtx.arc(best.jX, best.jY, 6, 0, Math.PI*2); sCtx.fill();
+
+    // UI Update
+    document.getElementById("bevelVal").textContent = best.bevelDeg.toFixed(1) + "°";
+    document.getElementById("wingLenVal").textContent = sweepInches.toFixed(2) + '"';
+
+    // --- TOP VIEW ---
+    tCtx.clearRect(0,0,tCanvas.width,tCanvas.height);
+    const tCX = 50, tCY = 200;
+    // Shaft
+    tCtx.fillStyle="#777"; 
+    tCtx.fillRect(tCX + sweepPx, tCY - gDiaPx/2, 250, gDiaPx);
+    // Bevel Nose
+    tCtx.fillStyle="#ffaa00";
+    tCtx.beginPath();
+    tCtx.moveTo(tCX + sweepPx, tCY - gDiaPx/2);
+    tCtx.quadraticCurveTo(tCX, tCY - gDiaPx/2, tCX, tCY);
+    tCtx.quadraticCurveTo(tCX, tCY + gDiaPx/2, tCX + sweepPx, tCY + gDiaPx/2);
+    tCtx.fill();
+}
+
+[document.getElementById("legAngle"), document.getElementById("vArm"), document.getElementById("prot")].forEach(i => i.oninput = draw);
+draw();
+</script>
+</body>
+</html>
