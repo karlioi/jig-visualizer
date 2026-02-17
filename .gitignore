@@ -1,0 +1,18 @@
+# OS-generated files
+.DS_Store
+Thumbs.db
+
+# Vim swap files
+.*.swp
+.*.swo
+
+# Python server
+--pycache--/
+*.py[cod]
+
+# Personal IDE settings
+.vscode/
+.idea/
+
+# Local logs
+*.log
