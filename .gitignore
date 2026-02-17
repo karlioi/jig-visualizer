@@ -1,10 +1,15 @@
+test.swp
 # OS-generated files
 .DS_Store
 Thumbs.db
 
 # Vim swap files
-.*.swp
-.*.swo
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-v][a-z]
+*.un~
+Session.vim
+*~
 
 # Python server
 --pycache--/
