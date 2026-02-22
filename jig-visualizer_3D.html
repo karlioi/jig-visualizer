@@ -2,23 +2,54 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Wolverine & Vari-Grind - Precision Geometry</title>
+<title>Jig Visualizer - 3D</title>
 <style>
-body{ font-family: 'Segoe UI', Arial; background:#111; color:#eee; text-align:center; margin: 0; padding: 20px; }
-.canvas-container { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; }
-canvas{ background:#151515; border:1px solid #444; border-radius:4px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-.controls { background:#222; padding:20px; display:inline-block; border-radius:8px; margin-top:20px; border:1px solid #333; }
-.stats { display:flex; justify-content:center; gap:20px; margin-bottom:10px; }
-.stat { background:#1a1a1a; padding:12px 20px; border-radius:8px; border-bottom:3px solid #00ffaa; min-width: 140px; }
-.stat-label { font-size:.75em; color:#888; text-transform:uppercase; letter-spacing:1px; }
-.stat-value { font-size:1.6em; color:#ffaa00; font-weight:bold; margin-top:5px; }
-label { margin: 0 15px; font-weight: bold; }
-span { font-weight:bold; color:#00ffaa; }
+/* --- CSS: VISUAL STYLING --- */
+    body{ 
+        font-family: 'Segoe UI', Arial; 
+        background:#111; 
+        color:#eee; 
+        text-align:center; 
+        margin: 0; padding: 20px; 
+    }
+    .canvas-container { 
+        display: flex; /* Side-by-side layout for the two view */
+        justify-content: center; 
+        gap: 20px; flex-wrap: wrap; 
+    }
+    canvas{ 
+        background:#151515; 
+        border:1px solid #444; 
+        border-radius:4px; 
+        box-shadow: 0 4px 15px rgba(0,0,0,0.5); 
+    }
+    .controls { 
+        background:#222; 
+        padding:20px; 
+        display:inline-block; 
+        border-radius:8px; 
+        margin-top:20px; 
+        border:1px solid #333; 
+    }
+    /* Stats Bar styling (The cards at the top) */
+    .stats { display:flex; justify-content:center; gap:20px; margin-bottom:10px; }
+    .stat { 
+        background:#1a1a1a; 
+        padding:12px 20px; 
+        border-radius:8px; 
+        border-bottom:3px solid #00ffaa; 
+        min-width: 140px; 
+    }
+    .stat-label { font-size:.75em; color:#888; text-transform:uppercase; letter-spacing:1px; }
+    .stat-value { font-size:1.6em; color:#ffaa00; font-weight:bold; margin-top:5px; }
+
+    label { margin: 0 15px; font-weight: bold; }
+    span { font-weight:bold; color:#00ffaa; }
 </style>
 </head>
 <body>
 
-<h2>Wolverine & Vari-Grind: Precision Model</h2>
+<h2>Jig Visualizer - 3D</h2>
 
 <div class="stats">
     <div class="stat"><div class="stat-label">Nose Bevel</div><div class="stat-value" id="bevelVal">--</div></div>
@@ -44,83 +75,121 @@ span { font-weight:bold; color:#00ffaa; }
 </div>
 
 <script>
+/* --- JAVASCRIPT: THE BRAINS --- */
+
+// 1. SETUP: Get references to the HTML elements
 const sCanvas = document.getElementById("sideCanvas");
 const tCanvas = document.getElementById("topCanvas");
 const sCtx = sCanvas.getContext("2d");
 const tCtx = tCanvas.getContext("2d");
 
-const scale = 35; 
-const wRad = 4;
-const gDia = 0.5;
-const webThick = 0.18; // Adjusted web
+// 2. CONSTANTS: Fixed physical properties (in inches usually)
+const scale = 35; // Pixels per inch (for drwaing)
+const wRad = 4; // Grinding wheel radius (8" wheel)
+const gDia = 0.5; // Diameter of the tool (the gouge)
+const webThick = 0.18; // Adjusted web (the "steel" thickness between bottom of flute and bottom of gouge)
 
+/**
+ * MAIN DRAW FUNCTION
+ * Triggered every time a slider moves
+ */
 function draw() {
+    // A. Read inputs from UI
     const legDeg = parseFloat(document.getElementById("legAngle").value);
     const vDistFace = parseFloat(document.getElementById("vArm").value);
     const prot = parseFloat(document.getElementById("prot").value);
-    
+
+    // B. Update text labels in the UI
     document.getElementById("legAngleVal").textContent = legDeg.toFixed(1);
     document.getElementById("vArmVal").textContent = vDistFace.toFixed(1);
     document.getElementById("protVal").textContent = prot.toFixed(2);
     document.getElementById("vDistStat").textContent = vDistFace.toFixed(1) + '"';
 
+    // C. Convert degree to Radians (Math.si/cos need radians)
     const legRad = legDeg * Math.PI / 180;
+
+    // D. Clear previous frames
     sCtx.clearRect(0,0,sCanvas.width,sCanvas.height);
     tCtx.clearRect(0,0,tCanvas.width,tCanvas.height);
 
+    // E. SET POSITIONS (The physics model)
     const wheelX = 120, wheelY = 140, wRPx = wRad * scale;
     const vPX = (wheelX + wRPx) + (vDistFace * scale);
     const vPY = wheelY + wRPx; 
     
+    // F. BRUTE FORCE GEOMETRY (Optimization loop)
+    // This loop searches for the exact point where the tool tip touches the wheel
     let best = null, minErr = Infinity;
 
     for(let a=Math.PI; a<2*Math.PI; a+=0.001) {
+        // Calculate the Joint (Pivot) position of the jig leg
         let jX = vPX + Math.cos(a)*5*scale, jY = vPY + Math.sin(a)*5*scale;
+
+        // Calculate Tool Direction and Tip position 
         let tDir = a - legRad;
         let tVX = Math.cos(tDir), tVY = Math.sin(tDir);
         let tX = jX + tVX * prot * scale, tY = jY + tVY * prot * scale;
+
+        // Calculate distance from wheel center to tool tip
         let rx = wheelX - tX, ry = wheelY - tY, d = Math.sqrt(rx*rx+ry*ry);
+
+        // Calculate Bevel Angle using the Dot Product
         let dot = ((-tVX)*rx + (-tVY)*ry) / d;
         let theta = Math.acos(Math.max(-1, Math.min(1, dot)));
         let bevelDeg = Math.abs(90 - (theta * 180 / Math.PI));
+
+        // Find the "Heel" (the bottom of the grind) based on metal thickness
         let bLen = webThick / Math.sin(theta); 
         let hX = tX - tVX * bLen * scale, hY = tY - tVY * bLen * scale;
+
+        // Geometry check: Is this point actually on the wheel face?
         let cAng = Math.atan2(hX - wheelX, wheelY - hY) * 180 / Math.PI;
         let err = Math.abs(Math.sqrt((hX-wheelX)**2 + (hY-wheelY)**2) - wRPx);
+
+        // Keep the result with the smallest error (closest to the wheel surface)
         if(err < minErr && cAng > 0 && cAng < 95) { 
             minErr=err; 
             best={jX,jY,tX,tY,hX,hY,tDir,bevelDeg,bLen,tVX,tVY}; 
         }
     }
 
-    if(!best) return;
+    if(!best) return; // Exit if no valid intersection found
 
+    // G. PERSPECTIVE CALCULATIONS (Creating the 3D look)
     // Constrained Perspective Math
-    const pX = -best.tVY, pY = best.tVX; 
+    const pX = -best.tVY, pY = best.tVX; // Perpendicular vector for tool width
     const gDiaPx = gDia * scale;
+
+    // Calculate how far back the "wings" of the grind go
     let sweepInches = Math.abs(Math.tan(legRad)) * (gDia/2) * 5; 
     sweepInches = Math.max(0.1, Math.min(3.5, sweepInches));
     const sweepPx = sweepInches * scale;
 
-    const wingTop = { x: (best.tX - best.tVX * sweepPx) + pX * gDiaPx, y: (best.tY - best.tVY * sweepPx) + pY * gDiaPx };
+    const wingTop = { 
+        x: (best.tX - best.tVX * sweepPx) + pX * gDiaPx, 
+        y: (best.tY - best.tVY * sweepPx) + pY * gDiaPx 
+    };
     const heel = { x: best.hX, y: best.hY };
 
-    // --- SIDE VIEW ---
+    // --- SIDE VIEW RENDERING ---
     sCtx.save();
-    // Grinding Wheel
+
+    // DrawGrinding Wheel
     sCtx.fillStyle="#444"; sCtx.beginPath(); sCtx.arc(wheelX,wheelY,wRPx,0,Math.PI*2); sCtx.fill();
     sCtx.strokeStyle="#666"; sCtx.lineWidth=2; sCtx.stroke();
     
-    // V-Arm and Pocket
+    // Draw V-Arm and the Pocket the jig sits in
     sCtx.fillStyle="#333"; sCtx.fillRect(wheelX, vPY, vPX - wheelX, 10);
     sCtx.strokeStyle="#00ffaa"; sCtx.lineWidth=3;
     sCtx.beginPath();
     sCtx.moveTo(vPX - 20, vPY); sCtx.lineTo(vPX, vPY); sCtx.lineTo(vPX, vPY - 20);
     sCtx.stroke();
 
+    // MASKING: This prevents the tool from appearing "inside" the wheel
     // Clip to Wheel Face
     sCtx.beginPath(); sCtx.rect(0,0,sCanvas.width,sCanvas.height); sCtx.arc(wheelX,wheelY,wRPx,0,Math.PI*2,true); sCtx.clip("evenodd");
 
+    // Define the back of the tool shaft for drawing
     // SHAFT AND BEVEL DRAWN AS ONE UNIT TO PREVENT GAPS
     const sBackX = best.tX - best.tVX * 12 * scale, sBackY = best.tY - best.tVY * 12 * scale;
     
@@ -141,7 +210,7 @@ function draw() {
     sCtx.beginPath();
     sCtx.moveTo(heel.x, heel.y);
     sCtx.lineTo(best.tX, best.tY);
-    // Cutting edge curve
+    // Cutting edge curve (The shape of the gouge tip)
     sCtx.quadraticCurveTo(best.tX + pX*gDiaPx - best.tVX*sweepPx*0.4, best.tY + pY*gDiaPx, wingTop.x, wingTop.y);
     // Trailing edge curve - Terminating exactly at heel
     sCtx.quadraticCurveTo(heel.x + pX*gDiaPx*0.5 - best.tVX*sweepPx*0.3, heel.y + pY*gDiaPx*0.5, heel.x, heel.y);
@@ -149,21 +218,24 @@ function draw() {
     sCtx.stroke(); 
     sCtx.restore();
 
-    // Vari-Grind Leg
+    // Draw the Vari-Grind Leg () The white line connecting the pivot to the base
     sCtx.strokeStyle="#eee"; sCtx.lineWidth=2.5;
     sCtx.beginPath(); sCtx.moveTo(vPX, vPY); sCtx.lineTo(best.jX, best.jY); sCtx.stroke();
     sCtx.fillStyle="#00ffaa"; sCtx.beginPath(); sCtx.arc(best.jX, best.jY, 6, 0, Math.PI*2); sCtx.fill();
 
+    // Update the resulting cards
     // UI Update
     document.getElementById("bevelVal").textContent = best.bevelDeg.toFixed(1) + "°";
     document.getElementById("wingLenVal").textContent = sweepInches.toFixed(2) + '"';
 
-    // --- TOP VIEW ---
+    // --- TOP VIEW RENDERING ---
     tCtx.clearRect(0,0,tCanvas.width,tCanvas.height);
     const tCX = 50, tCY = 200;
+
     // Shaft
     tCtx.fillStyle="#777"; 
     tCtx.fillRect(tCX + sweepPx, tCY - gDiaPx/2, 250, gDiaPx);
+
     // Bevel Nose
     tCtx.fillStyle="#ffaa00";
     tCtx.beginPath();
@@ -173,8 +245,12 @@ function draw() {
     tCtx.fill();
 }
 
+// 3. LISTENERS: Trigger the draw function whenever any slider moves
 [document.getElementById("legAngle"), document.getElementById("vArm"), document.getElementById("prot")].forEach(i => i.oninput = draw);
+
+// Initial run to show the model on page load
 draw();
 </script>
+
 </body>
 </html>
