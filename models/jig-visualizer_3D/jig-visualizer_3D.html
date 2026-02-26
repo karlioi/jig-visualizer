@@ -84,7 +84,7 @@ const sCtx = sCanvas.getContext("2d");
 const tCtx = tCanvas.getContext("2d");
 
 // 2. CONSTANTS: Fixed physical properties (in inches usually)
-const scale = 35; // Pixels per inch (for drwaing)
+const scale = 35; // Pixels per inch (for drawing)
 const wRad = 4; // Grinding wheel radius (8" wheel)
 const gDia = 0.5; // Diameter of the tool (the gouge)
 const webThick = 0.18; // Adjusted web (the "steel" thickness between bottom of flute and bottom of gouge)
@@ -125,7 +125,8 @@ function draw() {
         // Calculate the Joint (Pivot) position of the jig leg
         let jX = vPX + Math.cos(a)*5*scale, jY = vPY + Math.sin(a)*5*scale;
 
-        // Calculate Tool Direction and Tip position 
+        // Calculate Tool Direction and Tip Position
+        // tDir: Tool Direction Vector based on Leg Angle beta
         let tDir = a - legRad;
         let tVX = Math.cos(tDir), tVY = Math.sin(tDir);
         let tX = jX + tVX * prot * scale, tY = jY + tVY * prot * scale;
@@ -162,7 +163,7 @@ function draw() {
 
     // Calculate how far back the "wings" of the grind go
     let sweepInches = Math.abs(Math.tan(legRad)) * (gDia/2) * 5; 
-    sweepInches = Math.max(0.1, Math.min(3.5, sweepInches));
+    sweepInches = Math.max(0.1, Math.min(1.5, sweepInches));
     const sweepPx = sweepInches * scale;
 
     const wingTop = { 
@@ -218,7 +219,7 @@ function draw() {
     sCtx.stroke(); 
     sCtx.restore();
 
-    // Draw the Vari-Grind Leg () The white line connecting the pivot to the base
+    // Draw the jig leg (The white line connecting the pivot to the base)
     sCtx.strokeStyle="#eee"; sCtx.lineWidth=2.5;
     sCtx.beginPath(); sCtx.moveTo(vPX, vPY); sCtx.lineTo(best.jX, best.jY); sCtx.stroke();
     sCtx.fillStyle="#00ffaa"; sCtx.beginPath(); sCtx.arc(best.jX, best.jY, 6, 0, Math.PI*2); sCtx.fill();

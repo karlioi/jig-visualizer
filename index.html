@@ -1,26 +1,86 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Jig Visualizer Project</title>
+
     <style>
-        body { font-family: sans-serfif; max-width: 600px; margin: 2rem auto; line-height: 1.5; background: #f4f4f4; color: #333; }
-	h1 { border-bottom: 2px solid #2185d0; padding-bottom: 0.5rem; }
-	ul { list-style: none; padding: 0: }
-	li { margin: 1rem 0; background: white; padding: 1rem: border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-	a { text-decoration: none; color: #2185d0; font-weight: bold; }
-	a:hover { text-decoration: underline; }
+        body {
+            font-family: sans-serif;
+            max-width: 600px;
+            margin: 2rem auto;
+            line-height: 1.5;
+            background: linear-gradient(#f4f4f4, #eaeaea);
+            color: #333;
+        }
+
+	h1 {
+            border-bottom: 2px solid #2185d0;
+            padding-bottom: 0.5rem;
+        }
+
+	ul {
+            list-style: none;
+            padding: 0;
+        }
+
+	li {
+            margin: 1rem 0;
+            background: white;
+            padding: 1rem; 
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+	a {
+            text-decoration: none;
+            color: #2185d0;
+            font-weight: bold;
+        }
+
+	a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
+
 <body>
+
     <h1>Jig Visualizer</h1>
+
+    <p><em>Geometry models of jig-constrained gouge sharpening.</em></p>
+
     <p>Select a version to launch:</p>
+
     <ul>
-	<li><strong><a href="./jig-visualizer_3D/jig-visualizer_3D.html">Launch 3D Model (Current)</a></strong></li>
-	<li><a href="./jig-visualizer_2D/jig-visualizer_2D.html">2D Proof-of-Concept (Legacy)</a></li>
+	<li>
+            <strong>
+                <a href="./models/jig-visualizer_3D/jig-visualizer_3D.html">
+                    Launch 3D Model (Current)
+                </a>
+            </strong>
+            <small>Interactive visualization of gouge geometry.</small>
+        </li>
+	<li>
+            <strong>
+                <a href="./models/jig-visualizer_2D/jig-visualizer_2D.html">
+                    Launch 2D Model (Proof-of-Concept)
+                </a>
+            </strong>
+            <small>Simple interactive visualization.</small>
+        </li>
     </ul>
+
     <hr>
-    <p><small>Sovereignly hosted on <a href="https://codeberg.org">Codeberg</a></small></p>
+
+    <p>
+        <small>
+            Sovereignly hosted on
+            <a href="https://codeberg.org">Codeberg</a>
+        </small>
+    </p>
+
 </body>
 </html>
