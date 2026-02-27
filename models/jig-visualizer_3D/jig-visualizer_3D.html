@@ -120,10 +120,11 @@ function draw() {
     // F. BRUTE FORCE GEOMETRY (Optimization loop)
     // This loop searches for the exact point where the tool tip touches the wheel
     let best = null, minErr = Infinity;
+    const legLength = 5;
 
     for(let a=Math.PI; a<2*Math.PI; a+=0.001) {
         // Calculate the Joint (Pivot) position of the jig leg
-        let jX = vPX + Math.cos(a)*5*scale, jY = vPY + Math.sin(a)*5*scale;
+        let jX = vPX + Math.cos(a)*legLength*scale, jY = vPY + Math.sin(a)*legLength*scale;
 
         // Calculate Tool Direction and Tip Position
         // tDir: Tool Direction Vector based on Leg Angle beta
@@ -162,7 +163,7 @@ function draw() {
     const gDiaPx = gDia * scale;
 
     // Calculate how far back the "wings" of the grind go
-    let sweepInches = Math.abs(Math.tan(legRad)) * (gDia/2) * 5; 
+    let sweepInches = Math.abs(Math.tan(legRad)) * (gDia/2) * legLength; 
     sweepInches = Math.max(0.1, Math.min(1.5, sweepInches));
     const sweepPx = sweepInches * scale;
 
